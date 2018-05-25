@@ -48,203 +48,194 @@
 #include "certs.h"
 #endif // SET_TRUSTED_CERT_IN_SAMPLES
 
-/* Paste in the your iothub connection string  */
+/* Paste in the your iothub device connection string  */
 static const char* connectionString = "[device connection string]";
 
-static bool g_continueRunning;
 #define DOWORK_LOOP_NUM     3
 
 typedef struct MAKER_TAG
 {
-	char* makerName;
-	char* style;
-	int year;
+    char* makerName;
+    char* style;
+    int year;
 } Maker;
 
 typedef struct GEO_TAG
 {
-	double longitude;
-	double latitude;
+    double longitude;
+    double latitude;
 } Geo;
 
 typedef struct CAR_STATE_TAG
 {
-	int32_t softwareVersion;        // reported property
-	uint8_t reported_maxSpeed;      // reported property
-	char* vanityPlate;              // reported property
+    int32_t softwareVersion;        // reported property
+    uint8_t reported_maxSpeed;      // reported property
+    char* vanityPlate;              // reported property
 } CarState;
 
 typedef struct CAR_SETTINGS_TAG
 {
-	uint8_t desired_maxSpeed;       // desired property
-	Geo location;                   // desired property
+    uint8_t desired_maxSpeed;       // desired property
+    Geo location;                   // desired property
 } CarSettings;
 
 typedef struct CAR_TAG
 {
-	char* lastOilChangeDate;        // reported property
-	char* changeOilReminder;        // desired property
-	Maker maker;                    // reported property
-	CarState state;                 // reported property
-	CarSettings settings;           // desired property
+    char* lastOilChangeDate;        // reported property
+    char* changeOilReminder;        // desired property
+    Maker maker;                    // reported property
+    CarState state;                 // reported property
+    CarSettings settings;           // desired property
 } Car;
 
 static char* serializeToJson(Car* car)
 {
-	char* result;
+    char* result;
 
-	JSON_Value* root_value = json_value_init_object();
-	JSON_Object* root_object = json_value_get_object(root_value);
+    JSON_Value* root_value = json_value_init_object();
+    JSON_Object* root_object = json_value_get_object(root_value);
 
-	// Only reported properties:
-	(void)json_object_set_string(root_object, "lastOilChangeDate", car->lastOilChangeDate);
-	(void)json_object_dotset_string(root_object, "maker.makerName", car->maker.makerName);
-	(void)json_object_dotset_string(root_object, "maker.style", car->maker.style);
-	(void)json_object_dotset_number(root_object, "maker.year", car->maker.year);
-	(void)json_object_dotset_number(root_object, "state.reported_maxSpeed", car->state.reported_maxSpeed);
-	(void)json_object_dotset_number(root_object, "state.softwareVersion", car->state.softwareVersion);
-	(void)json_object_dotset_string(root_object, "state.vanityPlate", car->state.vanityPlate);
+    // Only reported properties:
+    (void)json_object_set_string(root_object, "lastOilChangeDate", car->lastOilChangeDate);
+    (void)json_object_dotset_string(root_object, "maker.makerName", car->maker.makerName);
+    (void)json_object_dotset_string(root_object, "maker.style", car->maker.style);
+    (void)json_object_dotset_number(root_object, "maker.year", car->maker.year);
+    (void)json_object_dotset_number(root_object, "state.reported_maxSpeed", car->state.reported_maxSpeed);
+    (void)json_object_dotset_number(root_object, "state.softwareVersion", car->state.softwareVersion);
+    (void)json_object_dotset_string(root_object, "state.vanityPlate", car->state.vanityPlate);
 
-	result = json_serialize_to_string(root_value);
-	
-	json_value_free(root_value);
+    result = json_serialize_to_string(root_value);
+    
+    json_value_free(root_value);
 
-	return result;
+    return result;
 }
 
 static Car* parseFromJson(const char* json)
 {
-	Car* car = malloc(sizeof(Car));
-	(void)memset(car, 0, sizeof(Car));
+    Car* car = malloc(sizeof(Car));
+    (void)memset(car, 0, sizeof(Car));
 
-	JSON_Value* root_value = json_parse_string(json);
-	JSON_Object* root_object = json_value_get_object(root_value);
+    JSON_Value* root_value = json_parse_string(json);
+    JSON_Object* root_object = json_value_get_object(root_value);
 
-	// Only desired properties:
-	JSON_Value* changeOilReminder = json_object_dotget_value(root_object, "desired.changeOilReminder");
-	JSON_Value* desired_maxSpeed = json_object_dotget_value(root_object, "desired.settings.desired_maxSpeed");
-	JSON_Value* latitude = json_object_dotget_value(root_object, "desired.settings.location.latitude");
-	JSON_Value* longitude = json_object_dotget_value(root_object, "desired.settings.location.longitude");
+    // Only desired properties:
+    JSON_Value* changeOilReminder = json_object_dotget_value(root_object, "desired.changeOilReminder");
+    JSON_Value* desired_maxSpeed = json_object_dotget_value(root_object, "desired.settings.desired_maxSpeed");
+    JSON_Value* latitude = json_object_dotget_value(root_object, "desired.settings.location.latitude");
+    JSON_Value* longitude = json_object_dotget_value(root_object, "desired.settings.location.longitude");
 
-	if (changeOilReminder != NULL)
-	{
-		const char* data = json_value_get_string(changeOilReminder);
+    if (changeOilReminder != NULL)
+    {
+        const char* data = json_value_get_string(changeOilReminder);
 
-		if (data != NULL)
-		{
-			car->changeOilReminder = malloc(strlen(data) + 1);
-			(void)strcpy(car->changeOilReminder, data);
-		}
-	}
+        if (data != NULL)
+        {
+            car->changeOilReminder = malloc(strlen(data) + 1);
+            (void)strcpy(car->changeOilReminder, data);
+        }
+    }
 
-	if (desired_maxSpeed != NULL)
-	{
-		car->settings.desired_maxSpeed = (uint8_t)json_value_get_number(desired_maxSpeed);
-	}
+    if (desired_maxSpeed != NULL)
+    {
+        car->settings.desired_maxSpeed = (uint8_t)json_value_get_number(desired_maxSpeed);
+    }
 
-	if (latitude != NULL)
-	{
-		car->settings.location.latitude = json_value_get_number(latitude);
-	}
+    if (latitude != NULL)
+    {
+        car->settings.location.latitude = json_value_get_number(latitude);
+    }
 
-	if (longitude != NULL)
-	{
-		car->settings.location.longitude = json_value_get_number(longitude);
-	}
+    if (longitude != NULL)
+    {
+        car->settings.location.longitude = json_value_get_number(longitude);
+    }
 
-	json_value_free(root_value);
+    json_value_free(root_value);
 
-	return car;
+    return car;
 }
 
 static int deviceMethodCallback(const char* method_name, const unsigned char* payload, size_t size, unsigned char** response, size_t* response_size, void* userContextCallback)
 {
-	(void)userContextCallback;
-	(void)payload;
-	(void)size;
+    (void)userContextCallback;
+    (void)payload;
+    (void)size;
 
-	int result;
+    int result;
 
-	if (strcmp("getCarVIN", method_name) == 0)
-	{
-		*response_size = 22;
-		response = malloc(sizeof(*response_size));
-		(void)sprintf((char *const)*response, "{ 1HGCM82633A004352 }");
-		result = 200;
-	}
-	else
-	{
-		// All other entries are ignored.
-		*response_size = 4;
-		response = malloc(sizeof(*response_size));
-		(void)sprintf((char *const)*response, "{ }");
-		result = -1;
-	}
+    if (strcmp("getCarVIN", method_name) == 0)
+    {
+        *response_size = 36;
+        *response = malloc(sizeof(*response_size));
+        (void)sprintf((char *const)*response, "{ \"Response\": \"1HGCM82633A004352\" }");
+        result = 200;
+    }
+    else
+    {
+        // All other entries are ignored.
+        *response_size = 4;
+        *response = malloc(sizeof(*response_size));
+        (void)sprintf((char *const)*response, "{ }");
+        result = -1;
+    }
 
-	return result;
+    return result;
 }
 
 static void deviceTwinCallback(DEVICE_TWIN_UPDATE_STATE update_state, const unsigned char* payLoad, size_t size, void* userContextCallback)
 {
-	(void)update_state;
-	(void)size;
+    (void)update_state;
+    (void)size;
 
     Car* oldCar = (Car*)userContextCallback;
-	Car* newCar = parseFromJson((const char*)payLoad);
+    Car* newCar = parseFromJson((const char*)payLoad);
 
-	if (newCar->changeOilReminder != NULL)
-	{
-		if (oldCar->changeOilReminder == NULL || 
-			strcmp(oldCar->changeOilReminder, newCar->changeOilReminder) != 0)
-		{
-			printf("Received a new changeOilReminder = %s\n", newCar->changeOilReminder);
+    if (newCar->changeOilReminder != NULL)
+    {
+        if (oldCar->changeOilReminder == NULL || 
+            strcmp(oldCar->changeOilReminder, newCar->changeOilReminder) != 0)
+        {
+            printf("Received a new changeOilReminder = %s\n", newCar->changeOilReminder);
 
-			if (oldCar->changeOilReminder != NULL)
-			{
-				free(oldCar->changeOilReminder);
-			}
+            if (oldCar->changeOilReminder != NULL)
+            {
+                free(oldCar->changeOilReminder);
+            }
 
-			oldCar->changeOilReminder = malloc(strlen(newCar->changeOilReminder) + 1);
-			(void)strcpy(oldCar->changeOilReminder, newCar->changeOilReminder);
+            oldCar->changeOilReminder = malloc(strlen(newCar->changeOilReminder) + 1);
+            (void)strcpy(oldCar->changeOilReminder, newCar->changeOilReminder);
+        }
+    }
 
-			g_continueRunning = false;
-		}
-	}
+    if (newCar->settings.desired_maxSpeed != 0)
+    {
+        if (newCar->settings.desired_maxSpeed != oldCar->settings.desired_maxSpeed)
+        {
+            printf("Received a new desired_maxSpeed = %" PRIu8 "\n", newCar->settings.desired_maxSpeed);
+            oldCar->settings.desired_maxSpeed = newCar->settings.desired_maxSpeed;
+        }
+    }
 
-	if (newCar->settings.desired_maxSpeed != 0)
-	{
-		if (newCar->settings.desired_maxSpeed != oldCar->settings.desired_maxSpeed)
-		{
-			printf("Received a new desired_maxSpeed = %" PRIu8 "\n", newCar->settings.desired_maxSpeed);
-			oldCar->settings.desired_maxSpeed = newCar->settings.desired_maxSpeed;
+    if (newCar->settings.location.latitude != 0)
+    {
+        if (newCar->settings.location.latitude != oldCar->settings.location.latitude)
+        {
+            printf("Received a new latitude = %f\n", newCar->settings.location.latitude);
+            oldCar->settings.location.latitude = newCar->settings.location.latitude;
+        }
+    }
+    
+    if (newCar->settings.location.longitude != 0)
+    {
+        if (newCar->settings.location.longitude != oldCar->settings.location.longitude)
+        {
+            printf("Received a new longitude = %f\n", newCar->settings.location.longitude);
+            oldCar->settings.location.longitude = newCar->settings.location.longitude;
+        }
+    }
 
-			g_continueRunning = false;
-		}
-	}
-
-	if (newCar->settings.location.latitude != 0)
-	{
-		if (newCar->settings.location.latitude != oldCar->settings.location.latitude)
-		{
-			printf("Received a new latitude = %f\n", newCar->settings.location.latitude);
-			oldCar->settings.location.latitude = newCar->settings.location.latitude;
-
-			g_continueRunning = false;
-		}
-	}
-	
-	if (newCar->settings.location.longitude != 0)
-	{
-		if (newCar->settings.location.longitude != oldCar->settings.location.longitude)
-		{
-			printf("Received a new longitude = %f\n", newCar->settings.location.longitude);
-			oldCar->settings.location.longitude = newCar->settings.location.longitude;
-
-			g_continueRunning = false;
-		}
-	}
-
-	free(newCar);
+    free(newCar);
 }
 
 static void reportedStateCallback(int status_code, void* userContextCallback)
@@ -258,7 +249,6 @@ void serializer_to_iothub_client_migration_run(void)
 {
     IOTHUB_CLIENT_TRANSPORT_PROVIDER protocol;
     IOTHUB_CLIENT_HANDLE iotHubClientHandle;
-    g_continueRunning = true;
 
     // Select the Protocol to use with the connection
 #ifdef SAMPLE_MQTT
@@ -300,31 +290,28 @@ void serializer_to_iothub_client_migration_run(void)
             }
 #endif // SET_TRUSTED_CERT_IN_SAMPLES
 
-			Car car;
-			memset(&car, 0, sizeof(Car));
-			car.lastOilChangeDate = "2016";
-			car.maker.makerName = "Fabrikam";
-			car.maker.style = "sedan";
-			car.maker.year = 2014;
-			car.state.reported_maxSpeed = 100;
-			car.state.softwareVersion = 1;
-			car.state.vanityPlate = "1I1";
+            Car car;
+            memset(&car, 0, sizeof(Car));
+            car.lastOilChangeDate = "2016";
+            car.maker.makerName = "Fabrikam";
+            car.maker.style = "sedan";
+            car.maker.year = 2014;
+            car.state.reported_maxSpeed = 100;
+            car.state.softwareVersion = 1;
+            car.state.vanityPlate = "1I1";
 
-			char* reportedProperties = serializeToJson(&car);
+            char* reportedProperties = serializeToJson(&car);
 
-			(void)IoTHubClient_SendReportedState(iotHubClientHandle, (const unsigned char*)reportedProperties, strlen(reportedProperties), reportedStateCallback, NULL);
-			(void)IoTHubClient_SetDeviceMethodCallback(iotHubClientHandle, deviceMethodCallback, NULL);
+            (void)IoTHubClient_SendReportedState(iotHubClientHandle, (const unsigned char*)reportedProperties, strlen(reportedProperties), reportedStateCallback, NULL);
+            (void)IoTHubClient_SetDeviceMethodCallback(iotHubClientHandle, deviceMethodCallback, NULL);
             (void)IoTHubClient_SetDeviceTwinCallback(iotHubClientHandle, deviceTwinCallback, &car);
 
-            do
-            {
-                ThreadAPI_Sleep(100);
-            } while (g_continueRunning);
+            getchar();
 
             IoTHubClient_Destroy(iotHubClientHandle);
-			free(reportedProperties);
-			free(car.changeOilReminder);
-		}
+            free(reportedProperties);
+            free(car.changeOilReminder);
+        }
 
         platform_deinit();
     }
