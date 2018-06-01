@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 #include <stdlib.h>
+#include <inttypes.h>
 #include <math.h>
 #include "azure_c_shared_utility/optimize_size.h"
 #include "azure_c_shared_utility/gballoc.h"
@@ -43,7 +44,7 @@ static char* get_epoch_time(char* timeBuffer)
     }
     else if (timeLen == sizeof(int32_t))
     {
-        if (sprintf(timeBuffer, "%d", (int32_t)epochTime) < 0)
+        if (sprintf(timeBuffer, "%"PRId32, (int32_t)epochTime) < 0)
         {
             LogError("Failed sprintf to timeBuffer with 4 bytes of time_t");
             result = NULL;
